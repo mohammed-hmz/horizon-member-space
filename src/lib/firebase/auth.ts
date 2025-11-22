@@ -10,6 +10,7 @@ import {
   getAuth
 } from 'firebase/auth';
 import { firebaseAuth } from '@/lib/firebase/config';
+
 export function onAuthStateChanged(callback: (user: User | null) => void) {
   if (!firebaseAuth) return () => {};
   return _onAuthStateChanged(firebaseAuth, callback);

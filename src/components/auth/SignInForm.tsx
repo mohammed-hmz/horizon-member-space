@@ -13,8 +13,9 @@ import AlertDialogSeccess from "../seccessAlert";
 import { cn } from "@/lib/utils";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import {  firebaseAuth } from "@/lib/firebase/config";
-// import { signInWithGoogle } from "@/lib/firebase/auth";
 import { useRouter } from "next/navigation";
+// import { useAuth } from "@/context/AuthContext";
+// import { signInWithGoogle } from "@/lib/firebase/auth";
 export default function AuthForm() {
   const [join, setjoin] = useState(true);
  const [name, setName] = useState("");
@@ -26,18 +27,19 @@ export default function AuthForm() {
  const [loading, setLoading] = useState(false);
  const [success, setSuccess] = useState<boolean>(false);
  const [error, setError] = useState<string | null>(null);
-const router = useRouter();
+//  const [user, setUser] = useState<User | null>(null);
+  const router = useRouter();
 //  const signWithGoogle = async () => {
 //     try {
 //       await signInWithGoogle();
-//       setInterval(() => {
-//         router.push("/");
+//       setInterval(() => {      
 //       }, 1000);
 //     } catch (error) {
 //       setError("Error signing in with Google please try again later.");
 //       console.error("Error signing in with Google:", error);
 //     }
 //   }
+
  const handleSubmitMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if(!password || !email){
@@ -47,12 +49,13 @@ const router = useRouter();
     try{      
        setError(null);
       setLoading(true);
-      await signInWithEmailAndPassword(firebaseAuth, email, password);
-        setInterval(() => {
-        router.push("/");
-      }, 1000);
-      setLoading(false);
-      
+    await signInWithEmailAndPassword(firebaseAuth, email, password);
+
+         setLoading(false);
+      // router.push("/");
+      router.refresh();
+    
+     
     } catch (error) {
     setError("Error signing in please check your credentials.");
       console.error("Error signing in:", error);

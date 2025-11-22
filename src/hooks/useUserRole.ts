@@ -13,7 +13,6 @@ export function useUserRole() {
         setRole(idTokenResult.claims.role as string || null);
       }
     }
-    
     fetchRole();
   }, [user]);
   
