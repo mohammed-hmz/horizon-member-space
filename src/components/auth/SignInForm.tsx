@@ -257,12 +257,28 @@ export default function AuthForm() {
         
                 {error && <p className="text-red-600 flex justify-center text-sm">{error}</p>}
 
-                <Button
-                  onClick={join ? handleSubmitJoin : handleSubmitMember}
-                  className={cn("h-8 w-[70%] w-[70%] flex justify-self-center cursor-pointer bg-gradient-to-r from-red-600 to-green-600 hover:from-red-700 hover:to-green-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300",loading ? "opacity-50 cursor-not-allowed" : "",!join ? "mt-4" : "mt-1")}>
-                  {loading&&join? "Submitting..." :!join&&loading? "Signing in..." : !join ? "Sign In" : "Submit Request"}
-                </Button>
-                
+          <Button
+  type="button"
+  disabled={loading}
+  onClick={(e) => {
+    e.preventDefault();
+    if (loading) return;
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    join ? handleSubmitJoin(e) : handleSubmitMember(e);
+  }}
+  className={cn(
+    "h-8 w-[70%] flex justify-self-center cursor-pointer bg-gradient-to-r from-red-600 to-green-600 hover:from-red-700 hover:to-green-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300",
+    loading && "opacity-50 cursor-not-allowed",
+    !join ? "mt-4" : "mt-1"
+  )}
+>
+  {
+    loading
+      ? (join ? "Submitting..." : "Signing in...")
+      : (join ? "Submit Request" : "Sign In")
+  }
+</Button>
+
                 {/* Forgot Password */}
                <AlertDialogSeccess open={success} onOpenChange={()=>setSuccess(false)} />
               </div>

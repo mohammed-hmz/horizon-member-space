@@ -1,9 +1,9 @@
+// middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { verifyIdToken } from "@/lib/firebase/authEdge";
 
-const PUBLIC_ROUTES = ["/signin", "/reset-password"];
-
+const PUBLIC_ROUTES = ["/signin","/reset-password"];
 const ROLE_PROTECTED_ROUTES: Record<string, string[]> = {
   admin: ["/admin"],
   user: ["/dashboard"],
@@ -12,31 +12,31 @@ const ROLE_PROTECTED_ROUTES: Record<string, string[]> = {
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  const token = req.cookies.get("session_token")?.value;
-
-  // 🚨 If user is logged in but tries to access /signin → redirect to home
-  if (token && PUBLIC_ROUTES.includes(pathname)) {
-    return NextResponse.redirect(new URL("/", req.url));
-  }
-
-  // 🚨 Public route and NOT logged in → allow it
+  // 1. Public routes -> always allowed
   if (PUBLIC_ROUTES.includes(pathname)) {
     return NextResponse.next();
   }
 
-  // 🚨 Protected route but no token → redirect to signin
+  // 2. Get your custom session cookie
+  const token = req.cookies.get("session_token")?.value;
+
+  // Not logged in
   if (!token) {
     return NextResponse.redirect(new URL("/signin", req.url));
   }
 
   try {
-    // 🔐 Verify Firebase token
+    // 3. Verify session cookie using next-firebase-auth-edge
     const decoded = await verifyIdToken(token);
+
+    // 4. Role-based rules
     const userRole = decoded.role;
 
-    // 🎯 Role-based protection
+    // Check each role
     for (const role in ROLE_PROTECTED_ROUTES) {
-      for (const protectedPath of ROLE_PROTECTED_ROUTES[role]) {
+      const protectedPaths = ROLE_PROTECTED_ROUTES[role];
+
+      for (const protectedPath of protectedPaths) {
         if (pathname.startsWith(protectedPath)) {
           if (userRole !== role) {
             return NextResponse.redirect(new URL("/unauthorized", req.url));
@@ -45,9 +45,14 @@ export async function middleware(req: NextRequest) {
       }
     }
 
+    // 5. Authenticated user should NOT access login/register pages
+    if (PUBLIC_ROUTES.includes(pathname)) {
+      return NextResponse.redirect(new URL("/", req.url));
+    }
+
     return NextResponse.next();
   } catch (err) {
-    console.error("Invalid Firebase cookie:", err);
+    console.error("Invalid cookie token:", err);
     return NextResponse.redirect(new URL("/signin", req.url));
   }
 }
