@@ -51,9 +51,9 @@ export default function AuthForm() {
       setLoading(true);
     await signInWithEmailAndPassword(firebaseAuth, email, password);
 
-         setLoading(false);
-      // router.push("/");
-      router.refresh();
+      setLoading(false);
+      // Navigate to home after successful sign in
+      router.push("/");
     
      
     } catch (error) {
