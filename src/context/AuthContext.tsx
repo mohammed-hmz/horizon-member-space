@@ -68,25 +68,13 @@ export function AuthContextProvider({
 
         // ➜ Only create session the first time the user logs in
         if (initial) {
-          try {
-            await createSession(idToken);
-            console.log("createSession: cookie set");
-          } catch (err) {
-            console.error("createSession failed:", err);
-          }
+          await createSession(idToken);
         }
-
         setUser(authUser);
-
         const idTokenResult = await authUser.getIdTokenResult();
         setUserRole((idTokenResult.claims.role as UserRole) || "user");
       } else {
-        try {
-          await removeSession();
-          console.log("removeSession: cookie removed");
-        } catch (err) {
-          console.error("removeSession failed:", err);
-        }
+        await removeSession();
         setUser(null);
         setUserRole(null);
       }

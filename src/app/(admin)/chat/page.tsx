@@ -1,3 +1,4 @@
-export default function ChatPage() {
+export default function Page() {
+
   return <div>Admin Chat Page</div>;
 }
