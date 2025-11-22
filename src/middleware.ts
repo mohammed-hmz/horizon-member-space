@@ -12,13 +12,13 @@ const ROLE_PROTECTED_ROUTES: Record<string, string[]> = {
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // 1. Public routes -> always allowed
-  if (PUBLIC_ROUTES.includes(pathname)) {
-    return NextResponse.next();
-  }
 
   // 2. Get your custom session cookie
   const token = req.cookies.get("session_token")?.value;
+  // 1. Public routes -> always allowed
+  if (PUBLIC_ROUTES.includes(pathname) && !token) {
+    return NextResponse.next();
+  }
 
   // Not logged in
   if (!token) {
@@ -31,7 +31,9 @@ export async function middleware(req: NextRequest) {
 
     // 4. Role-based rules
     const userRole = decoded.role;
-
+ if (PUBLIC_ROUTES.includes(pathname)&&userRole) {
+      return NextResponse.redirect(new URL("/", req.url));
+    }
     // Check each role
     for (const role in ROLE_PROTECTED_ROUTES) {
       const protectedPaths = ROLE_PROTECTED_ROUTES[role];
