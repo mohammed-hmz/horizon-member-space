@@ -15,7 +15,7 @@ import {
   signUpWithEmail,
   signOut,
 } from "@/lib/firebase/auth";
-import { createSession, removeSession } from "@/actions/auth-action";
+import { removeSession } from "@/actions/auth-action";
 import type { UserRole } from "@/types";
 
 interface AuthContextType {
@@ -60,16 +60,8 @@ export function AuthContextProvider({
   }, [user]);
 
   useEffect(() => {
-    let initial = true;
-
     const unsubscribe = onAuthStateChanged(async (authUser) => {
       if (authUser) {
-        const idToken = await authUser.getIdToken();
-
-        // ➜ Only create session the first time the user logs in
-        if (initial) {
-          await createSession(idToken);
-        }
         setUser(authUser);
         const idTokenResult = await authUser.getIdTokenResult();
         setUserRole((idTokenResult.claims.role as UserRole) || "user");
@@ -80,7 +72,6 @@ export function AuthContextProvider({
       }
 
       setLoading(false);
-      initial = false;
     });
 
     return () => unsubscribe();

@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { Search, Shield, Users} from 'lucide-react';
-import { User as userTp } from '@/types';
+import { Search, Shield, Users, Loader2, AlertCircle, Crown } from 'lucide-react';
+
 interface User {
   uid: string;
   email: string;
@@ -9,35 +9,47 @@ interface User {
   role: string;
   createdAt: string;
 }
+
 import AlertDialogDestructiveDemo from '@/components/globalAlert';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
+
 const roles = [
   { value: 'member', label: 'Member', description: 'Basic club access' },
   { value: 'contributor', label: 'Contributor', description: 'Can create content' },
   { value: 'moderator', label: 'Moderator', description: 'Can moderate content' },
   { value: 'manager', label: 'Manager', description: 'Can manage members' },
-  { value: 'admin', label: 'Admin', description: 'Full system access' }
+  { value: 'admin', label: 'Admin', description: 'Full system access' },
+  { value: 'root', label: 'Root', description: 'Super admin access' }
 ];
 
-export default function UserManagement({user, userRole}: {user: userTp, userRole: string}) {
+export default function UserManagement({ userRole }: { userRole: string }) {
   const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRole, setSelectedRole] = useState('all');
   const [updating, setUpdating] = useState<string | null>(null);
-  const [alert, setAlert] = useState<{trigger: boolean; message: string; color: string , description: string}>({trigger: false, message: '', color: '', description: ''});
-
+  const [loading, setLoading] = useState(true);
+  const [alert, setAlert] = useState<{trigger: boolean; message: string; color: string; description: string}>({
+    trigger: false, 
+    message: '', 
+    color: '', 
+    description: ''
+  });
+  const { user } = useAuth();
   const router = useRouter();
+
+  const isRoot = userRole === 'root';
+  const isAdmin = userRole === 'admin' || isRoot;
+
   useEffect(() => {
-    if (!user
-       || (userRole !== 'admin')
-      ) {
+    if (!user || !isAdmin) {
       router.push('unauthorized');
     }
-  }, [user, userRole, router]);
+  }, [user, isAdmin, router]);
 
   useEffect(() => {
-    // Mock data - replace with actual API call
-  const fetchUsers = async () => {
+    const fetchUsers = async () => {
+      setLoading(true);
       try {
         const response = await fetch('/api/list-users', { 
           method: 'GET',
@@ -45,6 +57,7 @@ export default function UserManagement({user, userRole}: {user: userTp, userRole
             'Authorization': `Bearer ${await user?.getIdToken()}`
           }
         });
+        
         if (response.ok) {
           const data = await response.json();
           setUsers(data.users.map((u: User) => ({
@@ -52,45 +65,105 @@ export default function UserManagement({user, userRole}: {user: userTp, userRole
             email: u.email,
             displayName: u.displayName || 'member',    
             role: u.role || 'member',
-            createdAt: new Date(u.createdAt).toISOString().split('T')[0]
+            createdAt: u.createdAt || '',
           })));
         } else {
           console.error('Failed to fetch users:', response.statusText);
+          setAlert({
+            trigger: true, 
+            message: 'Error loading users', 
+            color: 'red', 
+            description: 'Failed to fetch users from the server.'
+          });
         }
       } catch (error) {
         console.error('Error fetching users:', error);
+        setAlert({
+          trigger: true, 
+          message: 'Connection error', 
+          color: 'red', 
+          description: 'Could not connect to the server. Please try again.'
+        });
+      } finally {
+        setLoading(false);
       }
     };
 
+    if (user) {
       fetchUsers(); 
-    
-    
-  }, []);
+    }
+  }, [user]);
 
-  const handleRoleChange = async (userId: string, newRole: string) => {
+  const canModifyRole = (targetUserRole: string) => {
+    // Root can modify anyone
+    if (isRoot) return true;
+    
+    // Admin cannot modify admin or root roles
+    if (targetUserRole === 'admin' || targetUserRole === 'root') return false;
+    
+    return true;
+  };
+
+  const handleRoleChange = async (userId: string, currentRole: string, newRole: string) => {
+    // Prevent modification if not allowed
+    if (!canModifyRole(currentRole)) {
+      setAlert({
+        trigger: true, 
+        message: 'Permission denied', 
+        color: 'red', 
+        description: 'You do not have permission to modify admin or root roles.'
+      });
+      return;
+    }
+
+    // Root-only check for assigning admin/root roles
+    if ((newRole === 'admin' || newRole === 'root') && !isRoot) {
+      setAlert({
+        trigger: true, 
+        message: 'Permission denied', 
+        color: 'red', 
+        description: 'Only root users can assign admin or root roles.'
+      });
+      return;
+    }
+
     setUpdating(userId);
 
     try {
-          const response = await fetch('/api/assign-role', {
+      const response = await fetch('/api/assign-role', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ uid: userId, role: newRole })
       });
 
       if (response.ok) {
-      setUsers(users.map(u => u.uid === userId ? { ...u, role: newRole } : u));
-      setAlert({trigger: true, message: 'success updating role', color: 'green', description: `Role updated successfully. User will see changes on next login.`});
-         } else {
-      setAlert({trigger: true, message: 'error updating role', color: 'red', description: 'Failed to update role Please try again.'});
-  }
+        setUsers(users.map(u => u.uid === userId ? { ...u, role: newRole } : u));
+        setAlert({
+          trigger: true, 
+          message: 'Success', 
+          color: 'green', 
+          description: `Role updated successfully. User will see changes on next login.`
+        });
+      } else {
+        setAlert({
+          trigger: true, 
+          message: 'Update failed', 
+          color: 'red', 
+          description: 'Failed to update role. Please try again.'
+        });
+      }
     } catch (error) {
       console.error('Error updating role:', error);
-      setAlert({trigger: true, message: 'error updating role', color: 'red', description: 'Failed to update role due to server error. Please try again.'});
+      setAlert({
+        trigger: true, 
+        message: 'Server error', 
+        color: 'red', 
+        description: 'Failed to update role due to server error. Please try again.'
+      });
     } finally {
       setUpdating(null);
     }
   };
-
 
   const filteredUsers = users.filter(u => {
     const matchesSearch = u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -101,6 +174,51 @@ export default function UserManagement({user, userRole}: {user: userTp, userRole
 
   const getRoleInfo = (roleValue: string) => roles.find(r => r.value === roleValue) || roles[0];
 
+  // Loading skeleton
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white dark:bg-neutral-900 p-6">
+        <div className="max-w-7xl mx-auto">
+          {/* Header Skeleton */}
+          <div className="mb-8">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-neutral-200 dark:bg-neutral-800 rounded-lg animate-pulse w-10 h-10" />
+              <div className="h-8 w-64 bg-neutral-200 dark:bg-neutral-800 rounded animate-pulse" />
+            </div>
+            <div className="h-4 w-96 bg-neutral-200 dark:bg-neutral-800 rounded animate-pulse ml-14" />
+          </div>
+
+          {/* Filters Skeleton */}
+          <div className="bg-neutral-50 dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-6 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="h-12 bg-neutral-200 dark:bg-neutral-700 rounded-lg animate-pulse" />
+              <div className="h-12 bg-neutral-200 dark:bg-neutral-700 rounded-lg animate-pulse" />
+            </div>
+          </div>
+
+          {/* Stats Skeleton */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="bg-neutral-50 dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-4">
+                <div className="h-4 w-20 bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse mb-2" />
+                <div className="h-8 w-12 bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse" />
+              </div>
+            ))}
+          </div>
+
+          {/* Loading message */}
+          <div className="bg-neutral-50 dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-12">
+            <div className="flex flex-col items-center justify-center">
+              <Loader2 className="w-12 h-12 text-neutral-400 dark:text-neutral-600 animate-spin mb-4" />
+              <p className="text-neutral-600 dark:text-neutral-400 text-lg font-medium">Loading users...</p>
+              <p className="text-neutral-500 dark:text-neutral-500 text-sm mt-2">Please wait while we fetch the data</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-white dark:bg-neutral-900 p-6">
       <div className="max-w-7xl mx-auto">
@@ -108,11 +226,23 @@ export default function UserManagement({user, userRole}: {user: userTp, userRole
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-neutral-100 dark:bg-neutral-800 rounded-lg">
-              <Shield className="w-6 h-6 text-neutral-700 dark:text-neutral-300" />
+              {isRoot ? (
+                <Crown className="w-6 h-6 text-amber-600 dark:text-amber-500" />
+              ) : (
+                <Shield className="w-6 h-6 text-neutral-700 dark:text-neutral-300" />
+              )}
             </div>
             <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">User Management</h1>
+            {isRoot && (
+              <span className="px-3 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full text-sm font-semibold">
+                Root Access
+              </span>
+            )}
           </div>
-          <p className="text-neutral-600 dark:text-neutral-400 ml-14">Manage user roles and permissions for your club</p>
+          <p className="text-neutral-600 dark:text-neutral-400 ml-14">
+            Manage user roles and permissions for your club
+            {isRoot && " • You have full administrative privileges"}
+          </p>
         </div>
 
         {/* Notification */}
@@ -167,19 +297,27 @@ export default function UserManagement({user, userRole}: {user: userTp, userRole
           </div>
           <div className="bg-neutral-50 dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-4">
             <p className="text-neutral-600 dark:text-neutral-400 text-sm mb-1">Admins</p>
-            <p className="text-2xl font-bold text-neutral-900 dark:text-white">{users.filter(u => u.role === 'admin').length}</p>
+            <p className="text-2xl font-bold text-neutral-900 dark:text-white">
+              {users.filter(u => u.role === 'admin' || u.role === 'root').length}
+            </p>
           </div>
           <div className="bg-neutral-50 dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-4">
             <p className="text-neutral-600 dark:text-neutral-400 text-sm mb-1">Members</p>
-            <p className="text-2xl font-bold text-neutral-900 dark:text-white">{users.filter(u => u.role === 'member').length}</p>
+            <p className="text-2xl font-bold text-neutral-900 dark:text-white">
+              {users.filter(u => u.role === 'member').length}
+            </p>
           </div>
         </div>
+
         {/* Users Table */}
         <div className="bg-neutral-50 dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden">
           {filteredUsers.length === 0 ? (
             <div className="text-center py-12">
               <Users className="w-12 h-12 text-neutral-300 dark:text-neutral-600 mx-auto mb-3" />
               <p className="text-neutral-600 dark:text-neutral-400">No users found</p>
+              <p className="text-neutral-500 dark:text-neutral-500 text-sm mt-1">
+                Try adjusting your search or filters
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -188,49 +326,85 @@ export default function UserManagement({user, userRole}: {user: userTp, userRole
                   <tr className="border-b border-neutral-200 dark:border-neutral-700">
                     <th className="text-left p-4 text-sm font-semibold text-neutral-700 dark:text-neutral-300">User</th>
                     <th className="text-left p-4 text-sm font-semibold text-neutral-700 dark:text-neutral-300">Email</th>
-                    <th className="text-left p-4 text-sm font-semibold text-neutral-700 dark:text-neutral-300">Role</th>
+                    <th className="text-left p-4 text-sm font-semibold text-neutral-700 dark:text-neutral-300">Current Role</th>
                     <th className="text-left p-4 text-sm font-semibold text-neutral-700 dark:text-neutral-300">Joined</th>
-                    <th className="text-left p-4 text-sm font-semibold text-neutral-700 dark:text-neutral-300">Role</th>
-                    {userRole === null && (<th className="text-left p-4 text-sm font-semibold text-neutral-700 dark:text-neutral-300">Action</th>)}
+                    <th className="text-left p-4 text-sm font-semibold text-neutral-700 dark:text-neutral-300">Change Role</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredUsers.map(user => {
-                    const roleInfo = getRoleInfo(user.role);
-                    const isUpdating = updating === user.uid;
+                  {filteredUsers.map(targetUser => {
+                    const roleInfo = getRoleInfo(targetUser.role);
+                    const isUpdating = updating === targetUser.uid;
+                    const canModify = canModifyRole(targetUser.role);
+                    const isCurrentUser = user?.uid === targetUser.uid;
 
                     return (
-                      <tr key={user.uid} className="border-b border-neutral-200 dark:border-neutral-700 dark:hover:bg-neutral-700 hover:bg-neutral-100 transition-colors">
+                      <tr 
+                        key={targetUser.uid} 
+                        className="border-b border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+                      >
                         <td className="p-4">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center font-semibold text-neutral-700 dark:text-neutral-300">
-                              {user.displayName.charAt(0).toUpperCase()}
+                              {targetUser.displayName.charAt(0).toUpperCase()}
                             </div>
-                            <span className="font-medium text-neutral-900 dark:text-white">{user.displayName}</span>
+                            <div className="flex flex-col">
+                              <span className="font-medium text-neutral-900 dark:text-white">
+                                {targetUser.displayName}
+                              </span>
+                              {isCurrentUser && (
+                                <span className="text-xs text-neutral-500 dark:text-neutral-400">(You)</span>
+                              )}
+                            </div>
                           </div>
                         </td>
-                        <td className="p-4 text-neutral-600 dark:text-neutral-400">{user.email}</td>
+                        <td className="p-4 text-neutral-600 dark:text-neutral-400">{targetUser.email}</td>
                         <td className="p-4">
-                          <span className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300">
+                          <span className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+                            targetUser.role === 'root' 
+                              ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
+                              : targetUser.role === 'admin'
+                              ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                              : 'bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300'
+                          }`}>
+                            {targetUser.role === 'root' && <Crown className="w-3 h-3 inline mr-1" />}
                             {roleInfo.label}
                           </span>
                         </td>
-                        <td className="p-4 text-neutral-600 dark:text-neutral-400 text-sm">{user.createdAt}</td>
-                      
+                        <td className="p-4 text-neutral-600 dark:text-neutral-400 text-sm">
+                          {targetUser.createdAt}
+                        </td>
                         <td className="p-4">
                           <div className="flex items-center gap-2">
-                            <select
-                              value={user.role}
-                              onChange={(e) => handleRoleChange(user.uid, e.target.value)}
-                              disabled={isUpdating}
-                              className="px-3 py-2 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-neutral-400 dark:focus:ring-neutral-500 disabled:opacity-50 disabled:cursor-not-allowed text-neutral-900 dark:text-white cursor-pointer"
-                            >
-                              {roles.map(role => (
-                                <option key={role.value} value={role.value}>{role.label}</option>
-                              ))}
-                            </select>
-                            {isUpdating && (
-                              <div className="w-4 h-4 border-2 border-neutral-300 dark:border-neutral-600 border-t-neutral-600 dark:border-t-neutral-300 rounded-full animate-spin" />
+                            {!canModify ? (
+                              <div className="flex items-center gap-2 text-neutral-500 dark:text-neutral-400 text-sm">
+                                <AlertCircle className="w-4 h-4" />
+                                <span>Restricted</span>
+                              </div>
+                            ) : (
+                              <>
+                                <select
+                                  value={targetUser.role}
+                                  onChange={(e) => handleRoleChange(targetUser.uid, targetUser.role, e.target.value)}
+                                  disabled={isUpdating || !canModify}
+                                  className="px-3 py-2 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-neutral-400 dark:focus:ring-neutral-500 disabled:opacity-50 disabled:cursor-not-allowed text-neutral-900 dark:text-white cursor-pointer"
+                                >
+                                  {roles.map(role => {
+                                    // Hide admin/root options for non-root users
+                                    if (!isRoot && (role.value === 'admin' || role.value === 'root')) {
+                                      return null;
+                                    }
+                                    return (
+                                      <option key={role.value} value={role.value}>
+                                        {role.label}
+                                      </option>
+                                    );
+                                  })}
+                                </select>
+                                {isUpdating && (
+                                  <Loader2 className="w-4 h-4 text-neutral-600 dark:text-neutral-300 animate-spin" />
+                                )}
+                              </>
                             )}
                           </div>
                         </td>
@@ -248,9 +422,14 @@ export default function UserManagement({user, userRole}: {user: userTp, userRole
           <div className="w-5 h-5 rounded-full bg-neutral-300 dark:bg-neutral-700 flex items-center justify-center flex-shrink-0 mt-0.5">
             <span className="text-neutral-700 dark:text-neutral-300 text-xs font-bold">i</span>
           </div>
-          <p className="text-sm text-neutral-700 dark:text-neutral-300">
-            Role changes take effect immediately, but users may need to refresh their session to see updated permissions.
-          </p>
+          <div className="text-sm text-neutral-700 dark:text-neutral-300 space-y-1">
+            <p>Role changes take effect immediately, but users may need to refresh their session to see updated permissions.</p>
+            {!isRoot && (
+              <p className="text-neutral-600 dark:text-neutral-400">
+                Note: Only root users can modify admin and root roles. You cannot assign admin privileges.
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </div>

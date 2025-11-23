@@ -13,6 +13,7 @@ import AlertDialogSeccess from "../seccessAlert";
 import { cn } from "@/lib/utils";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import {  firebaseAuth } from "@/lib/firebase/config";
+import { createSession } from "@/actions/auth-action";
 import { useRouter } from "next/navigation";
 // import { useAuth } from "@/context/AuthContext";
 // import { signInWithGoogle } from "@/lib/firebase/auth";
@@ -49,10 +50,22 @@ export default function AuthForm() {
     try{      
        setError(null);
       setLoading(true);
-    await signInWithEmailAndPassword(firebaseAuth, email, password);
+      const credential = await signInWithEmailAndPassword(
+        firebaseAuth,
+        email,
+        password
+      );
+
+      // Ensure server session cookie is created before navigating
+      try {
+        const idToken = await credential.user.getIdToken();
+        await createSession(idToken);
+      } catch (err) {
+        console.error("createSession from sign-in form failed:", err);
+      }
 
       setLoading(false);
-      // Navigate to home after successful sign in
+      // Navigate to home after successful sign in and session creation
       router.push("/");
     
      

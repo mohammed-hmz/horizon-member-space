@@ -6,6 +6,6 @@ export default function ManageUsersPage() {
   // For demonstration, passing dummy user and role
   const { user, userRole } = useAuth();
   if (user && userRole === 'admin') {
-  return <UserManagement user={user} userRole={userRole} />;
+  return <UserManagement userRole={userRole} />;
 }
 }
