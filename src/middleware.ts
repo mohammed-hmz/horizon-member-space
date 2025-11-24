@@ -16,11 +16,11 @@ export async function middleware(req: NextRequest) {
   const token = req.cookies.get("session_token")?.value;
 
   // Debug: log route and whether a token is present (local dev only)
-  try {
-    console.log('middleware:', { pathname, hasToken: !!token });
-  } catch (err) {
-    console.error('middleware logging error:', err);
-  }
+  // try {
+  //   console.log('middleware:', { pathname, hasToken: !!token });
+  // } catch (err) {
+  //   console.error('middleware logging error:', err);
+  // }
 
   // 1. Public routes -> always allowed
   if (PUBLIC_ROUTES.includes(pathname) && !token) {
