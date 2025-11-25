@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Separator } from '@/components/ui/separator';
@@ -30,6 +30,7 @@ type Task = {
   assignedTo: string;
   assignedToName: string;
   completed: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   completedAt: any;
   priority: "low" | "medium" | "high";
 };
@@ -44,6 +45,7 @@ type Notification = {
   id: string;
   message: string;
   taskId: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   createdAt: any;
   readBy: string[];
 };
@@ -53,7 +55,7 @@ export type Project = {
   title: string;
   description: string;
   status: string;
-  createdAt: any;
+  createdAt: never;
   category?: string;
   members: Member[];
   tasks: Task[];
@@ -69,7 +71,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, currentUserId = 'use
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isAcceptDeclineOpen, setIsAcceptDeclineOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<string | null>(null);
-  const [completedTasks, setCompletedTasks] = useState<Set<string>>(new Set());
+  // const [completedTasks, setCompletedTasks] = useState<Set<string>>(new Set());
   const [readNotifications, setReadNotifications] = useState<Set<string>>(new Set());
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -126,11 +128,11 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, currentUserId = 'use
     return priorityMap[priority] || 'bg-gray-100 text-gray-800';
   };
 
-  const handleMarkComplete = (taskId: string) => {
-    setCompletedTasks(prev => new Set(prev).add(taskId));
-    setShowSuccessAlert(true);
-    setTimeout(() => setShowSuccessAlert(false), 3000);
-  };
+  // const handleMarkComplete = (taskId: string) => {
+  //   setCompletedTasks(prev => new Set(prev).add(taskId));
+  //   setShowSuccessAlert(true);
+  //   setTimeout(() => setShowSuccessAlert(false), 3000);
+  // };
 
   const handleNotificationClick = (notificationId: string) => {
     setReadNotifications(prev => new Set(prev).add(notificationId));
@@ -158,7 +160,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, currentUserId = 'use
   };
 
   const isTaskCompleted = (task: Task) => {
-    return task.completed || completedTasks.has(task.id);
+    return task.completed || false;
   };
 
   const getUnreadNotifications = () => {
@@ -553,7 +555,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, currentUserId = 'use
                 onClick={() => handleDeclineRole("I can't do it")}>
                 <div>
                   <div className="font-medium text-sm text-white">
-                    I can't do this type of work
+                    I can&apos;t do this type of work
                   </div>
                   <div className="text-xs text-zinc-500">
                     This task is outside my expertise
@@ -566,9 +568,9 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, currentUserId = 'use
                 className="w-full justify-start text-left p-4 h-auto border-zinc-700 hover:bg-zinc-800"
                 onClick={() => handleDeclineRole("Not available")}>
                 <div>
-                  <div className="font-medium text-sm text-white">I'm not available</div>
+                  <div className="font-medium text-sm text-white">I&apos;m not available</div>
                   <div className="text-xs text-zinc-500">
-                    I don't have time for this project
+                    I don&apos;t have time for this project
                   </div>
                 </div>
               </Button>
