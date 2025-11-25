@@ -21,7 +21,7 @@ export async function middleware(req: NextRequest) {
   try {
     // 3. Verify the ID token and refresh if expired
     const result = await verifyAndRefreshExpiredIdToken(
-      { idToken, refreshToken }
+      { idToken, refreshToken, metadata: {} }
     );
 
     const res = NextResponse.next();
