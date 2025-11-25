@@ -1,0 +1,354 @@
+// prisma/schema.prisma
+// CORRECTED database schema for university club app (Neon + Prisma + Firebase auth)
+
+// ---------------------------------------------
+// GENERATOR & DATASOURCE
+// ---------------------------------------------
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------
+// ENUMS
+// ---------------------------------------------
+enum Role {
+  MEMBER
+  OFFICER
+  ADMIN
+}
+
+enum LibraryType {
+  BOOK
+  JOURNAL
+  VIDEO
+  AUDIO
+  OTHER
+}
+
+enum CalendarItemType {
+  EVENT
+  ACTIVITY
+  MEETING
+}
+
+enum RSVPStatus {
+  PENDING
+  CONFIRMED
+  DECLINED
+  TENTATIVE
+}
+
+enum ProjectStatus {
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+  CANCELLED
+}
+
+// ---------------------------------------------
+// USER (Firebase authenticated)
+// ---------------------------------------------
+model User {
+  id            Int       @id @default(autoincrement())
+  uid           String    @unique
+  email         String    @unique
+  name          String
+  number       String?
+  avatar        String?
+  role          Role      @default(MEMBER)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  // Relations
+  notificationsRead NotificationRead[]
+  projectMemberships ProjectMember[]
+  createdProjects    Project[]        @relation("ProjectCreator")
+  createdEvents      Event[]
+  createdActivities  Activity[]
+  createdMeetings    Meeting[]
+  createdLibraryItems LibraryItem[]
+  createdForms       Form[]
+  createdCalendarEntries CalendarEntry[]
+  attendees         Attendee[]
+  meetingMembers    MeetingMember[]
+  auditLogs         AuditLog[]
+
+  @@index([email])
+  @@index([createdAt])
+  @@index([isActive])
+}
+
+// ---------------------------------------------
+// NOTIFICATION SYSTEM
+// ---------------------------------------------
+model Notification {
+  id        Int      @id @default(autoincrement())
+  title     String
+  body      String?
+  data      Json?
+  createdAt DateTime @default(now())
+  expiresAt DateTime?
+
+  reads NotificationRead[]
+
+  @@index([createdAt])
+  @@index([expiresAt])
+}
+
+model NotificationRead {
+  id             Int          @id @default(autoincrement())
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  notificationId Int
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         Int
+  readAt         DateTime     @default(now())
+
+  @@unique([notificationId, userId])
+  @@index([userId])
+  @@index([readAt])
+}
+
+// ---------------------------------------------
+// PROJECTS
+// ---------------------------------------------
+model Project {
+  id            Int             @id @default(autoincrement())
+  title         String
+  slug          String          @unique
+  description   String?
+  status        ProjectStatus   @default(ACTIVE)
+  creator       User            @relation("ProjectCreator", fields: [creatorId], references: [id])
+  creatorId     Int
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  completedAt   DateTime?
+
+  projectMembers ProjectMember[]
+  updates        ProjectUpdate[]
+
+  @@index([slug])
+  @@index([status])
+  @@index([creatorId])
+  @@index([createdAt])
+}
+
+model ProjectMember {
+  id        Int       @id @default(autoincrement())
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId Int
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  role      Role      @default(MEMBER)
+  joinedAt  DateTime  @default(now())
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@index([joinedAt])
+}
+
+model ProjectUpdate {
+  id         Int      @id @default(autoincrement())
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId  Int
+  title      String
+  content    String
+  createdBy  User     @relation(fields: [createdById], references: [id])
+  createdById Int
+  createdAt  DateTime @default(now())
+
+  @@index([projectId])
+  @@index([createdAt])
+}
+
+// ---------------------------------------------
+// CALENDAR SYSTEM (Simplified & Fixed)
+// ---------------------------------------------
+model CalendarEntry {
+  id          Int              @id @default(autoincrement())
+  type        CalendarItemType
+  title       String
+  description String?
+  location    String?
+  startAt     DateTime
+  endAt       DateTime?
+  isAllDay    Boolean          @default(false)
+  createdBy   User             @relation(fields: [createdById], references: [id])
+  createdById Int
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  // Optional specific item relations
+  eventId     Int?
+  event       Event?           @relation(fields: [eventId], references: [id])
+
+  activityId  Int?
+  activity    Activity?        @relation(fields: [activityId], references: [id])
+
+  meetingId   Int?
+  meeting     Meeting?         @relation(fields: [meetingId], references: [id])
+
+  @@index([startAt])
+  @@index([type])
+  @@index([createdById])
+@@index([eventId])
+@@index([activityId])
+@@index([meetingId])
+
+}
+
+// ---------------------------------------------
+// EVENTS
+// ---------------------------------------------
+model Event {
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String?
+  location    String?
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  createdById Int
+  startAt     DateTime
+  endAt       DateTime?
+  isPublic    Boolean   @default(true)
+  maxAttendees Int?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+    form        Form?   @relation("EventForm")
+  calendarEntry CalendarEntry?
+
+  @@index([startAt])
+  @@index([createdById])
+  @@index([isPublic])
+}
+
+// ---------------------------------------------
+// ACTIVITIES
+// ---------------------------------------------
+model Activity {
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String?
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  createdById Int
+  startAt     DateTime
+  endAt       DateTime?
+  isMemberOnly Boolean  @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  calendarEntry CalendarEntry?
+
+  @@index([startAt])
+  @@index([createdById])
+  @@index([isMemberOnly])
+}
+
+// ---------------------------------------------
+// MEETINGS
+// ---------------------------------------------
+model Meeting {
+  id          Int       @id @default(autoincrement())
+  title       String
+  agenda      String?
+  location    String?
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  createdById Int
+  startAt     DateTime
+  endAt       DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  calendarEntry CalendarEntry?
+
+  @@index([startAt])
+  @@index([createdById])
+}
+
+
+
+// ---------------------------------------------
+// LIBRARY
+// ---------------------------------------------
+model LibraryItem {
+  id          Int         @id @default(autoincrement())
+  title       String
+  description String?
+  type        LibraryType @default(OTHER)
+  url         String?
+  metadata    Json?
+  createdBy   User        @relation(fields: [createdById], references: [id])
+  createdById Int
+  createdAt   DateTime    @default(now())
+  isPublic    Boolean     @default(true)
+
+  @@index([type])
+  @@index([createdById])
+  @@index([createdAt])
+  @@index([isPublic])
+}
+
+// ---------------------------------------------
+// FORMS & ATTENDANCE
+// ---------------------------------------------
+model Form {
+  id          Int        @id @default(autoincrement())
+  title       String
+  description String?
+  createdBy   User       @relation(fields: [createdById], references: [id])
+  createdById Int
+  createdAt   DateTime   @default(now())
+  fields      Json
+  isActive    Boolean    @default(true)
+    event       Event?  @relation("EventForm", fields: [eventId], references: [id])
+  eventId     Int?
+  attendees   Attendee[]
+
+  @@index([createdById])
+  @@index([isActive])
+}
+
+model Attendee {
+  id        Int       @id @default(autoincrement())
+
+  form      Form      @relation(fields: [formId], references: [id], onDelete: Cascade)
+  formId    Int
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+
+  formData  Json?
+  createdAt DateTime  @default(now())
+
+  @@unique([formId, userId])
+  @@index([userId])
+  @@index([formId])
+}
+
+
+// ---------------------------------------------
+// AUDIT LOG
+// ---------------------------------------------
+model AuditLog {
+  id        Int       @id @default(autoincrement())
+  actorId   Int?
+  actor     User?     @relation(fields: [actorId], references: [id])
+  action    String
+  resource  String?
+  details   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime  @default(now())
+
+  @@index([actorId])
+  @@index([action])
+  @@index([createdAt])
+  @@index([resource])
+}
