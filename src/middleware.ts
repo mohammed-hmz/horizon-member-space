@@ -17,6 +17,9 @@ export async function middleware(req: NextRequest) {
   if (!idToken || !refreshToken) {
     return NextResponse.redirect(new URL("/signin", req.url));
   }
+   if (pathname === "/signin" && idToken) {
+    return NextResponse.redirect(new URL("/", req.url));
+  }
 
   try {
     // 3. Verify the ID token and refresh if expired
