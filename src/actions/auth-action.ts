@@ -3,7 +3,8 @@
 
 import { cookies } from 'next/headers';
 
-const SESSION_COOKIE = 'session_token';
+const ID_COOKIE = 'id_token';
+const REFRESH_COOKIE = 'refresh_token';
 const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
@@ -12,14 +13,26 @@ const COOKIE_OPTIONS = {
   path: '/',
 };
 
-export async function createSession(token: string) {
+export async function createSession(idToken: string, refreshToken: string) {
   const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE, token, COOKIE_OPTIONS);
+
+  // Short-lived ID token cookie
+  cookieStore.set(ID_COOKIE, idToken, {
+    ...COOKIE_OPTIONS,
+    maxAge: 60 * 60, // 1 hour (ID token lifetime)
+  });
+
+  // Long-lived refresh token cookie
+  cookieStore.set(REFRESH_COOKIE, refreshToken, {
+    ...COOKIE_OPTIONS,
+    maxAge: 60 * 60 * 24 * 30, // 30 days
+  });
 }
 
 export async function removeSession() {
   const cookieStore = await cookies();
-  cookieStore.delete(SESSION_COOKIE);
+  cookieStore.delete(ID_COOKIE);
+    cookieStore.delete(REFRESH_COOKIE);
 }
 
 export async function getSession() {
@@ -28,5 +41,5 @@ export async function getSession() {
   // if (!verificationToken) {
   //   return null;
   // }
-  return cookieStore.get(SESSION_COOKIE)?.value || null;
+  return cookieStore.get(ID_COOKIE)?.value || null;
 }

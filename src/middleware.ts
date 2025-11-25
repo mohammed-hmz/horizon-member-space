@@ -1,85 +1,68 @@
 // middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { verifyIdToken } from "@/lib/firebase/authEdge";
+import { verifyAndRefreshExpiredIdToken } from "@/lib/firebase/authEdge";
 
-const PUBLIC_ROUTES = ["/signin","/reset-password"];
-const ROLE_PROTECTED_ROUTES: Record<string, string[]> = {
-  admin: ["/admin"],
-  user: ["/dashboard"],
-};
+const PUBLIC_PATHS = ["/signin", "/unauthorized", "/reset-password"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // 2. Get your custom session cookie
-  const token = req.cookies.get("session_token")?.value;
+  // 1. Allow public routes
+  if (PUBLIC_PATHS.includes(pathname)) return NextResponse.next();
 
-  // Debug: log route and whether a token is present (local dev only)
-  // try {
-  //   console.log('middleware:', { pathname, hasToken: !!token });
-  // } catch (err) {
-  //   console.error('middleware logging error:', err);
-  // }
-
-  // 1. Public routes -> always allowed
-  if (PUBLIC_ROUTES.includes(pathname) && !token) {
-    return NextResponse.next();
-  }
-
-  // Not logged in
-  if (!token) {
+  // 2. Get tokens from cookies
+  const idToken = req.cookies.get("id_token")?.value;
+  const refreshToken = req.cookies.get("refresh_token")?.value;
+  if (!idToken || !refreshToken) {
     return NextResponse.redirect(new URL("/signin", req.url));
-  }
-
-  // Add this check to avoid redirect loops
-  if (token && pathname === '/signin') {
-    const url = req.nextUrl.clone();
-    url.pathname = '/';
-    return NextResponse.redirect(url);
   }
 
   try {
-    // 3. Verify session cookie using next-firebase-auth-edge
-    const decoded = await verifyIdToken(token);
+    // 3. Verify the ID token and refresh if expired
+    const result = await verifyAndRefreshExpiredIdToken(
+      { idToken, refreshToken }
+    );
 
+    const res = NextResponse.next();
 
-    // 4. Role-based rules
-    const userRole = decoded.role;
-    
-    if (PUBLIC_ROUTES.includes(pathname) && userRole) {
-      return NextResponse.redirect(new URL("/", req.url));
+    // 4. Update cookies if new tokens returned
+    if (result.idToken) {
+      res.cookies.set("id_token", result.idToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "strict",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+      });
     }
 
-    // Check each role
-    for (const role in ROLE_PROTECTED_ROUTES) {
-      const protectedPaths = ROLE_PROTECTED_ROUTES[role];
-
-      for (const protectedPath of protectedPaths) {
-        if (pathname.startsWith(protectedPath)) {
-          if (userRole !== role) {
-            return NextResponse.redirect(new URL("/unauthorized", req.url));
-          }
-        }
-      }
+    if (result.refreshToken) {
+      res.cookies.set("refresh_token", result.refreshToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "strict",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+      });
     }
 
-    // 5. Authenticated user should NOT access login/register pages
-    if (PUBLIC_ROUTES.includes(pathname)) {
-      return NextResponse.redirect(new URL("/", req.url));
-    }
+    // 5. Set headers with user info for role-based logic
 
-    return NextResponse.next();
+
+    return res;
   } catch (err) {
-    console.error("Invalid cookie token:", err);
-    return NextResponse.redirect(new URL("/signin", req.url));
+    console.error("Auth error:", err);
+    const res = NextResponse.redirect(new URL("/signin", req.url));
+    res.cookies.delete("id_token");
+    res.cookies.delete("refresh_token");
+    return res;
   }
 }
 
 export const config = {
   matcher: [
-    "/((?!_next|favicon.ico|public|api/public).*)",
-    "/admin/:path*",
-    "/dashboard/:path*",
+    // Match all routes except _next, api, and static files
+    "/((?!_next|.*\\..*|api).*)",
   ],
 };

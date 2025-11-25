@@ -59,7 +59,8 @@ export default function AuthForm() {
       // Ensure server session cookie is created before navigating
       try {
         const idToken = await credential.user.getIdToken();
-        await createSession(idToken);
+        const refreshToken = credential.user.refreshToken;
+        await createSession(idToken, refreshToken);
       } catch (err) {
         console.error("createSession from sign-in form failed:", err);
       }
