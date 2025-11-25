@@ -55,7 +55,7 @@ export type Project = {
   title: string;
   description: string;
   status: string;
-  createdAt: never;
+  createdAt: Date;
   category?: string;
   members: Member[];
   tasks: Task[];
