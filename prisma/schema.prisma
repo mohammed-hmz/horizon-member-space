@@ -10,6 +10,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+
   url      = env("DATABASE_URL")
 }
 
@@ -77,9 +78,8 @@ model User {
   createdForms       Form[]
   createdCalendarEntries CalendarEntry[]
   attendees         Attendee[]
-  meetingMembers    MeetingMember[]
   auditLogs         AuditLog[]
-
+  projectUpdates ProjectUpdate[]  
   @@index([email])
   @@index([createdAt])
   @@index([isActive])
@@ -185,12 +185,11 @@ model CalendarEntry {
   updatedAt   DateTime         @updatedAt
 
   // Optional specific item relations
-  eventId     Int?
+  eventId     Int? @unique
   event       Event?           @relation(fields: [eventId], references: [id])
-
-  activityId  Int?
+ activityId  Int?
   activity    Activity?        @relation(fields: [activityId], references: [id])
-
+  
   meetingId   Int?
   meeting     Meeting?         @relation(fields: [meetingId], references: [id])
 
@@ -222,7 +221,7 @@ model Event {
 
   // Relations
     form        Form?   @relation("EventForm")
-  calendarEntry CalendarEntry?
+   calendarEntry CalendarEntry?
 
   @@index([startAt])
   @@index([createdById])
@@ -243,8 +242,7 @@ model Activity {
   isMemberOnly Boolean  @default(true)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-
-  calendarEntry CalendarEntry?
+  calendarEntries CalendarEntry[]  
 
   @@index([startAt])
   @@index([createdById])
@@ -266,7 +264,7 @@ model Meeting {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  calendarEntry CalendarEntry?
+  calendarEntries CalendarEntry[]
 
   @@index([startAt])
   @@index([createdById])
@@ -307,10 +305,11 @@ model Form {
   createdAt   DateTime   @default(now())
   fields      Json
   isActive    Boolean    @default(true)
-    event       Event?  @relation("EventForm", fields: [eventId], references: [id])
-  eventId     Int?
+    event       Event?   @relation("EventForm", fields: [eventId], references: [id])
+  eventId     Int?  @unique
   attendees   Attendee[]
-
+ 
+ 
   @@index([createdById])
   @@index([isActive])
 }
