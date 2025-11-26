@@ -66,7 +66,6 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   deletedAt     DateTime?
-
   // Relations
   notificationsRead NotificationRead[]
   projectMemberships ProjectMember[]
@@ -101,7 +100,6 @@ model Notification {
   @@index([createdAt])
   @@index([expiresAt])
 }
-
 model NotificationRead {
   id             Int          @id @default(autoincrement())
   notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
@@ -263,7 +261,7 @@ model Meeting {
   endAt       DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-
+  
   calendarEntries CalendarEntry[]
 
   @@index([startAt])
