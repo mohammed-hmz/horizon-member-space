@@ -9,11 +9,12 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // 1. Allow public routes
-  if (PUBLIC_PATHS.includes(pathname)) return NextResponse.next();
+    const idToken = req.cookies.get("id_token")?.value;
+  const refreshToken = req.cookies.get("refresh_token")?.value;
+  if (PUBLIC_PATHS.includes(pathname)&& (!idToken||!refreshToken)) return NextResponse.next();
 
   // 2. Get tokens from cookies
-  const idToken = req.cookies.get("id_token")?.value;
-  const refreshToken = req.cookies.get("refresh_token")?.value;
+
   if (!idToken || !refreshToken) {
     return NextResponse.redirect(new URL("/signin", req.url));
   }

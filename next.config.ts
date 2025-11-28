@@ -8,8 +8,17 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "images.unsplash.com",
       },
+      {
+        protocol: "https",
+        hostname: "example.com",
+      },
+      {
+        protocol: "https",
+        hostname: "blog-cdn.reedsy.com",
+      },
     ],
   },
+
   webpack(config) {
     config.module.rules.push({
       test: /\.svg$/,

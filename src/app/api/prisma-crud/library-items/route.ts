@@ -9,7 +9,22 @@ export async function GET() {
 // POST create a new library item
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const item = await prisma.libraryItem.create({ data: body });
+  console.log("Creating library item with data:", body);
+  // Ensure required fields exist. If createdById isn't supplied by the client,
+  // fall back to a safe default (development/testing). In production this
+  // should be derived from the authenticated session.
+  console.log("body", body);
+  const data = {
+    title: body.title,
+    description: body.description || null,
+    type: body.type || undefined,
+    url: body.url || null,
+    metadata: body.metadata || undefined,
+    isPublic: typeof body.isPublic === "boolean" ? body.isPublic : true,
+    createdById: body.createdById || 1,
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const item = await prisma.libraryItem.create({ data: data as any })
   return NextResponse.json(item);
 }
 
