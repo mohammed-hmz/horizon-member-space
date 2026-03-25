@@ -1,5 +1,7 @@
-"use client";
+
+import ClubChatPage from "@/components/chatClub";
 export default function Page() {
 
-  return <div>Admin Chat Page</div>;
+
+  return <ClubChatPage />;
 }
